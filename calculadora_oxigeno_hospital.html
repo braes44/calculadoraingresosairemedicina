@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Calculadora de Oxígeno Hospitalario (PSA / LOX / Cilindros)</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial; color:#042;}
+    body{max-width:1100px;margin:18px auto;padding:18px;background:#f7fff7;border:1px solid #e0efe0;border-radius:10px}
+    h1,h2{color:#033;}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    label{display:block;font-size:13px;margin-bottom:6px}
+    input[type=text], input[type=number], select{width:100%;padding:8px;border-radius:6px;border:1px solid #cfe7cf}
+    .card{background:#fff;padding:12px;border-radius:8px;border:1px solid #e6f2e6;box-shadow:0 2px 0 rgba(0,0,0,0.03)}
+    button{background:#038;border:none;color:white;padding:8px 12px;border-radius:8px;cursor:pointer}
+    button.secondary{background:#6aa86a}
+    pre{background:#eef9ef;padding:10px;border-radius:8px;overflow:auto}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:6px;border-bottom:1px solid #eef9ef;text-align:left}
+    .full{grid-column:1 / -1}
+    .muted{color:#556}
+    .result{background:#eaffea;padding:10px;border-radius:6px;border:1px solid #cfe7cf}
+    .warn{background:#fff4e5;border:1px solid #ffe1b8;padding:8px;border-radius:6px}
+  </style>
+</head>
+<body>
+  <h1>Calculadora de Oxígeno Hospitalario — PSA / LOX / Cilindros</h1>
+  <p class="muted">Una herramienta autónoma (HTML+JS) para estimar consumo, equivalentes en cilindros, producción mensual, comparar costos y evaluar riesgos/estrategias. Valores por defecto basados en recomendaciones técnicas (OPS/OMS).</p>
+
+  <div class="grid">
+    <div class="card">
+      <h2>1) Datos del hospital</h2>
+      <label>Nº de camas</label>
+      <input id="beds" type="number" value="100" />
+
+      <label>Ocupación estimada (%)</label>
+      <input id="occupancy" type="number" value="80" />
+
+      <label>% Pacientes graves (flujo por paciente, L/min)</label>
+      <input id="pct_grave" type="number" value="75" />
+      <input id="flow_grave" type="number" value="10" />
+
+      <label>% Pacientes críticos (flujo por paciente, L/min)</label>
+      <input id="pct_critical" type="number" value="25" />
+      <input id="flow_critical" type="number" value="30" />
+
+      <label>Horas operación diarias (plantas/operación)</label>
+      <input id="hours_per_day" type="number" value="24" />
+
+      <label>Días por mes (para cálculos)</label>
+      <input id="days_month" type="number" value="30" />
+
+      <button onclick="calcAll()">Calcular consumo</button>
+    </div>
+
+    <div class="card">
+      <h2>2) Resultados de consumo</h2>
+      <div id="consumption_result" class="result">Ingrese datos y presione "Calcular consumo".</div>
+
+      <h3>Agregar puntos de consumo (opcional)</h3>
+      <div id="points_container"></div>
+      <button class="secondary" onclick="addPoint()">Agregar punto</button>
+    </div>
+
+    <div class="card full">
+      <h2>3) Calculadora de cilindros</h2>
+      <div class="grid">
+        <div>
+          <label>Volumen interno del cilindro (L)</label>
+          <input id="cyl_vol" type="number" value="50" />
+        </div>
+        <div>
+          <label>Presión de llenado (bar gauge)</label>
+          <input id="cyl_pbar" type="number" value="150" />
+        </div>
+        <div>
+          <label>Opción de unidades de presión</label>
+          <select id="cyl_units"><option value="bar">bar</option><option value="psi">psi</option></select>
+        </div>
+        <div>
+          <label>Precio por llenado (USD)</label>
+          <input id="cyl_price" type="number" value="20" />
+        </div>
+      </div>
+      <p class="muted">Fórmula física aplicada (Boyle): volumen utilizable a presión atmosférica = V_cil * (P_abs / P_atm).</p>
+      <button onclick="calcCylinder()">Calcular contenido y coste por m³</button>
+      <div id="cyl_result" class="result"></div>
+    </div>
+
+    <div class="card full">
+      <h2>4) Plantas PSA — producción y modelo de costos</h2>
+      <div class="grid">
+        <div>
+          <label>Capacidad de la planta (m³/h)</label>
+          <input id="psa_m3ph" type="number" value="50" />
+        </div>
+        <div>
+          <label>Potencia media en operación (kW)</label>
+          <input id="psa_kw" type="number" value="60" />
+        </div>
+        <div>
+          <label>Uptime / disponibilidad (%)</label>
+          <input id="psa_uptime" type="number" value="95" />
+        </div>
+        <div>
+          <label>Tarifa eléctrica (USD/kWh)</label>
+          <input id="elec_rate" type="number" value="0.12" step="0.01" />
+        </div>
+        <div>
+          <label>Costos anuales de mantenimiento (USD)</label>
+          <input id="psa_maint" type="number" value="5000" />
+        </div>
+        <div>
+          <label>Capex planta (USD)</label>
+          <input id="psa_capex" type="number" value="120000" />
+        </div>
+        <div>
+          <label>Vida útil (años)</label>
+          <input id="psa_life" type="number" value="10" />
+        </div>
+      </div>
+      <button onclick="calcPSA()">Calcular producción y costo unitario PSA</button>
+      <div id="psa_result" class="result"></div>
+    </div>
+
+    <div class="card full">
+      <h2>5) Comparador de proveedores (LOX y Cilindros)</h2>
+      <div class="grid">
+        <div>
+          <label>Precio LOX por m³ (USD/m³)</label>
+          <input id="lox_price_m3" type="number" value="8" />
+        </div>
+        <div>
+          <label>Pérdida por evaporación / logística (%)</label>
+          <input id="lox_loss_pct" type="number" value="2" />
+        </div>
+        <div>
+          <label>Precio por cilindro (USD)</label>
+          <input id="cyl_price_market" type="number" value="20" />
+        </div>
+      </div>
+      <button onclick="compareSuppliers()">Comparar costos por m³</button>
+      <div id="compare_result" class="result"></div>
+    </div>
+
+    <div class="card full">
+      <h2>6) Análisis de escenarios y riesgos</h2>
+      <label>Fiabilidad eléctrica (0-100)</label>
+      <input id="elec_reliability" type="number" value="80" />
+      <label>Disponibilidad de repuestos y servicio técnico (0-100)</label>
+      <input id="service_avail" type="number" value="60" />
+      <label>Proximidad del proveedor (0-100)</label>
+      <input id="supplier_proximity" type="number" value="50" />
+      <label>Presencia de respaldo (LOX o cilindros) (0=ninguno,1=SI)</label>
+      <select id="has_backup"><option value="0">0</option><option value="1">1</option></select>
+      <button onclick="scenarioAnalysis()">Evaluar riesgo y recomendaciones</button>
+      <div id="scenario_result" class="result"></div>
+    </div>
+
+    <div class="card full">
+      <h2>Acciones recomendadas rápidas</h2>
+      <div id="quick_recs" class="muted">Después de ejecutar los cálculos, aquí aparecerán recomendaciones operacionales basadas en las guías.</div>
+      <button onclick="downloadJSON()">Exportar configuración (JSON)</button>
+      <button onclick="print()">Imprimir página</button>
+    </div>
+  </div>
+
+  <script>
+    // Utility helpers
+    function n(v){return Number(v)||0}
+
+    function calcAll(){
+      // Calculate base consumption from COVID example logic (but flexible)
+      const beds = n(document.getElementById('beds').value);
+      const occupancy = n(document.getElementById('occupancy').value)/100;
+      const pct_grave = n(document.getElementById('pct_grave').value)/100;
+      const pct_critical = n(document.getElementById('pct_critical').value)/100;
+      const flow_grave = n(document.getElementById('flow_grave').value);
+      const flow_critical = n(document.getElementById('flow_critical').value);
+
+      const beds_in_use = Math.round(beds * occupancy);
+      const num_grave = Math.round(beds_in_use * pct_grave);
+      const num_critical = Math.round(beds_in_use * pct_critical);
+
+      const lpm_total = (num_grave * flow_grave) + (num_critical * flow_critical);
+      const m3ph = lpm_total * 0.06; // L/min to m3/h
+      const m3pd = m3ph * n(document.getElementById('hours_per_day').value);
+      const m3pm = m3pd * n(document.getElementById('days_month').value);
+
+      const out = `Pacientes en uso: ${beds_in_use} (graves ${num_grave}, críticos ${num_critical})\n`+
+            `Consumo total estimado: ${lpm_total.toLocaleString()} L/min = ${m3ph.toFixed(2)} m³/h = ${m3pd.toFixed(2)} m³/día = ${m3pm.toFixed(2)} m³/mes`;
+      document.getElementById('consumption_result').innerText = out;
+      return {beds_in_use,num_grave,num_critical,lpm_total,m3ph,m3pd,m3pm};
+    }
+
+    function addPoint(){
+      const container = document.getElementById('points_container');
+      const idx = container.children.length;
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.innerHTML = `<label>Punto ${idx+1} - Nº de tomas</label><input type="number" id="p_count_${idx}" value="1" />`+
+                      `<label>Flujo por toma (L/min)</label><input type="number" id="p_flow_${idx}" value="5" />`+
+                      `<button onclick="removePoint(this)">Eliminar</button>`;
+      container.appendChild(div);
+    }
+    function removePoint(btn){btn.parentElement.remove();}
+
+    function calcCylinder(){
+      const V = n(document.getElementById('cyl_vol').value); // liters internal
+      const units = document.getElementById('cyl_units').value;
+      let p = n(document.getElementById('cyl_pbar').value);
+      if(units==='psi'){
+        // convert psi to bar (1 psi = 0.0689476 bar)
+        p = p * 0.0689476;
+      }
+      // p is gauge in bar -> absolute pressure = p + 1.01325 bar
+      const P_abs = p + 1.01325;
+      const liters_at_atm = V * (P_abs / 1.01325); // Boyle's law
+      const m3_atm = liters_at_atm / 1000.0;
+      const price = n(document.getElementById('cyl_price').value);
+      const cost_per_m3 = price / m3_atm || Infinity;
+
+      const txt = `Cilindro interno ${V} L, llenado a ${p.toFixed(2)} bar (gauge) -> volumen equivalente a presión atmosférica: ${liters_at_atm.toFixed(0)} L = ${m3_atm.toFixed(3)} m³.\nCosto por llenado: USD ${price.toFixed(2)} -> costo efectivo USD/${m3_atm.toFixed(3)} m³ = USD ${cost_per_m3.toFixed(2)}/m³`;
+      document.getElementById('cyl_result').innerText = txt;
+      return {V,p,P_abs,liters_at_atm,m3_atm,cost_per_m3};
+    }
+
+    function calcPSA(){
+      const m3ph = n(document.getElementById('psa_m3ph').value);
+      const kw = n(document.getElementById('psa_kw').value);
+      const uptime = n(document.getElementById('psa_uptime').value)/100;
+      const elec_rate = n(document.getElementById('elec_rate').value);
+      const maint = n(document.getElementById('psa_maint').value);
+      const capex = n(document.getElementById('psa_capex').value);
+      const life = Math.max(1,n(document.getElementById('psa_life').value));
+
+      const hours_year = 24 * 365;
+      const annual_hours = hours_year * uptime;
+      const annual_production_m3 = m3ph * annual_hours;
+      const annual_electricity_cost = kw * annual_hours * elec_rate;
+      const annualized_capex = capex / life;
+      const total_annual_cost = annualized_capex + annual_electricity_cost + maint;
+      const cost_per_m3 = total_annual_cost / (annual_production_m3 || 1);
+
+      const txt = `Producción nominal: ${m3ph.toFixed(2)} m³/h. Producción anual estimada (uptime ${ (uptime*100).toFixed(1)}%): ${annual_production_m3.toFixed(0)} m³/año.\nCostos anuales: electricidad USD ${annual_electricity_cost.toFixed(2)}, mantenimiento USD ${maint.toFixed(2)}, amortización USD ${annualized_capex.toFixed(2)} -> costo anual total USD ${total_annual_cost.toFixed(2)}.\nCosto estimado de producción PSA: USD ${cost_per_m3.toFixed(3)} por m³.`;
+      document.getElementById('psa_result').innerText = txt;
+      return {annual_production_m3,annual_electricity_cost,annualized_capex,total_annual_cost,cost_per_m3};
+    }
+
+    function compareSuppliers(){
+      // Compare LOX price and cylinder price using cylinder content calc
+      const lox_price = n(document.getElementById('lox_price_m3').value);
+      const lox_loss = n(document.getElementById('lox_loss_pct').value)/100;
+
+      const cyl_market = n(document.getElementById('cyl_price_market').value);
+      // Use cylinder calc to get m3 per cylinder
+      const cyl = calcCylinder();
+      const m3_per_cyl = cyl.m3_atm;
+      const cost_per_m3_cyl = cyl_market / (m3_per_cyl||1);
+
+      const lox_effective_cost = lox_price / (1 - lox_loss);
+
+      // get PSA cost
+      const psa = calcPSA();
+
+      let best = 'PSA (producción propia)';
+      let bestcost = psa.cost_per_m3;
+      if(lox_effective_cost < bestcost){best='LOX proveedor'; bestcost=lox_effective_cost;}
+      if(cost_per_m3_cyl < bestcost){best='Cilindros proveedor'; bestcost=cost_per_m3_cyl;}
+
+      const txt = `Costos estimados (USD/m³):\n• PSA: ${psa.cost_per_m3.toFixed(3)} USD/m³\n• LOX (incluyendo pérdida ${ (lox_loss*100).toFixed(1)}%): ${lox_effective_cost.toFixed(3)} USD/m³\n• Cilindro (precio por llenado): ${cost_per_m3_cyl.toFixed(3)} USD/m³\n\nRecomendación simple: opción con menor costo por m³ -> ${best} (USD ${bestcost.toFixed(3)}/m³)`;
+      document.getElementById('compare_result').innerText = txt;
+      return {psa,lox_effective_cost,cost_per_m3_cyl,best,bestcost};
+    }
+
+    function scenarioAnalysis(){
+      const elec_rel = n(document.getElementById('elec_reliability').value);
+      const svc = n(document.getElementById('service_avail').value);
+      const prox = n(document.getElementById('supplier_proximity').value);
+      const has_backup = n(document.getElementById('has_backup').value);
+
+      // simple weighted risk score for relying on PSA as primary
+      // higher score = more risky
+      // weights: electricity 30%, service 30%, proximity 20%, backup 20%
+      const risk = ( (100-elec_rel)*0.3 + (100-svc)*0.3 + (100-prox)*0.2 + (has_backup?0:20) );
+
+      const recs = [];
+      if(risk>60) recs.push('Riesgo alto: NO depender exclusivamente de PSA. Mantener o contratar suministro LOX o cilindros como respaldo.');
+      if(risk>40 && risk<=60) recs.push('Riesgo moderado: mejorar contratos de mantenimiento y asegurar generador eléctrico con capacidad.');
+      if(risk<=40) recs.push('Riesgo bajo-moderado: PSA viable si se mantiene 72h de reserva y contrato de servicio.');
+      recs.push('Mantener reserva de emergencia >= 72 horas (recomendación OPS/OMS).');
+      recs.push('Capacitar al personal de farmacia e ingeniería en operación y control de calidad del gas.');
+
+      document.getElementById('scenario_result').innerText = `Puntuación de riesgo (0 mejor — 100 peor): ${risk.toFixed(1)}\nRecomendaciones:\n- ${recs.join('\n- ')}`;
+      document.getElementById('quick_recs').innerText = recs.join('\n');
+      return {risk,recs};
+    }
+
+    function downloadJSON(){
+      const state = {
+        hospital: {
+          beds: n(document.getElementById('beds').value), occupancy: n(document.getElementById('occupancy').value)
+        },
+        psa: {
+          m3ph: n(document.getElementById('psa_m3ph').value), kw: n(document.getElementById('psa_kw').value)
+        }
+      };
+      const blob = new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download='config_oxigeno.json'; a.click(); URL.revokeObjectURL(url);
+    }
+
+    // initial calc
+    calcAll();
+  </script>
+
+  <footer style="margin-top:18px;color:#345">
+    <small>Basado en recomendaciones técnicas para adopción y operación de plantas PSA y buenas prácticas en el uso racional del oxígeno. Esta herramienta facilita estimaciones y comparaciones; no sustituye un estudio técnico de ingeniería ni contratos comerciales.</small>
+  </footer>
+</body>
+</html>
